@@ -38,7 +38,7 @@ try {
     "✅ memberLogs loaded successfully"
   );
 
-  require("./lorelleroot")(client);
+  require("./urcommands/lorelleroot")(client);
   
   console.log(
     "✅ lorelleroot loaded successfully"
