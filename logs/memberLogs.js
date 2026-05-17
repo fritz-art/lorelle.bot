@@ -58,5 +58,31 @@ module.exports = (client) => {
       console.error("Welcome error:", err);
     }
   });
+  client.on(Events.GuildMemberRemove, async (member) => {
+    try {
+      const channel = member.guild.channels.cache.get(config.logChannels.member);
+      if (!channel) return console.log("❌ Leave channel not found");
+
+      const user = member.user;
+
+      const embed = new EmbedBuilder()
+        .setColor("#090247")
+        .setAuthor({
+          name: "𝕷𝖔𝖗𝖊𝖑𝖑𝖊 𝕲𝖆𝖙𝖊",
+          iconURL: member.guild.iconURL({ dynamic: true }) || undefined
+        })
+        .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+        .setDescription(`Goodbye, ${user}! We'll miss you.`)
+        .setFooter({
+          text: "Owen & Gwen Bloodline"
+        })
+        .setTimestamp();
+
+      channel.send({ embeds: [embed] });
+
+    } catch (err) {
+      console.error("Leave error:", err);
+    }
+  });
 
 };
