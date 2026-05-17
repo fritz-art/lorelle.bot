@@ -8,7 +8,7 @@ const {
 } = require("discord.js");
 
 
-/* 🌸 discord client setup ni mami rora */
+/*discord client setup*/
 
 
 const client = new Client({
@@ -27,7 +27,7 @@ const client = new Client({
 });
 
 
-/* 🌸 loading member logs ni mami rora */
+/*loading member logs*/
 
 
 try {
@@ -56,7 +56,7 @@ try {
 }
 
 
-/* 🌸 ready event ni mami rora */
+/*ready event ni mami rora*/
 
 
 client.once(Events.ClientReady, () => {
