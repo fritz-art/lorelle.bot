@@ -60,7 +60,7 @@ module.exports = (client) => {
   });
   client.on(Events.GuildMemberRemove, async (member) => {
     try {
-      const channel = member.guild.channels.cache.get(config.logChannels.member);
+      const channel = member.guild.channels.cache.get(config.logChannels.leave);
       if (!channel) return console.log("❌ Leave channel not found");
 
       const user = member.user;
