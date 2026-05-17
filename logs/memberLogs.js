@@ -34,7 +34,7 @@ module.exports = (client) => {
         .setThumbnail(user.displayAvatarURL({ dynamic: true }))
 
         .setDescription(
-        `Welcome to **𝕷𝖔𝖗𝖊𝖑𝖑𝖊 𝕲𝖆𝖙𝖊 Family** ${user}
+        `Welcome to **𝕷𝖔𝖗𝖊𝖑𝖑𝖊 Family** ${user}
 
         **User's Details:**
         > Discord User: ${user}
