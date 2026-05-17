@@ -44,7 +44,7 @@ module.exports = (client) => {
         Carry the name with pride. Make your presence known.`
         )
 
-        .setImage("https://cdn.discordapp.com/attachments/1474088506782650641/1504434384735047730/2jm03mn.png?ex=6a07a1f4&is=6a065074&hm=c7e787cfc3ced9b5b9f332e3bcd026da4c2ea8ba54157ffb8adb00b28eea7b43&")
+        .setImage("https://cdn.discordapp.com/attachments/1505411224760750202/1505411339529486336/nhhn757.gif?ex=6a0a8710&is=6a093590&hm=69b83c8734cec274a43d986985553f3303b425fd48db730401f1d95f3e53cbff&")
 
         .setFooter({
           text: "Owen & Gwen Bloodline"
