@@ -47,7 +47,7 @@ module.exports = (client) => {
         .setImage("https://cdn.discordapp.com/attachments/1505411224760750202/1505411339529486336/nhhn757.gif?ex=6a0a8710&is=6a093590&hm=69b83c8734cec274a43d986985553f3303b425fd48db730401f1d95f3e53cbff&")
 
         .setFooter({
-          text: "Owen & Gwen Bloodline"
+          text: "Owen's Bloodline"
         })
 
         .setTimestamp();
