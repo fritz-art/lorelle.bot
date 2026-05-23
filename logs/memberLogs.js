@@ -74,7 +74,7 @@ module.exports = (client) => {
         .setThumbnail(user.displayAvatarURL({ dynamic: true }))
         .setDescription(`Goodbye, ${user}! We'll miss you.`)
         .setFooter({
-          text: "Owen & Gwen Bloodline"
+          text: "Owen's Bloodline"
         })
         .setTimestamp();
 
