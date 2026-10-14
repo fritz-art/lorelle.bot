@@ -1,0 +1,232 @@
+const {
+  Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle,
+  ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder,
+  EmbedBuilder
+} = require('discord.js');
+const config = require('./config');
+
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages]
+});
+
+// Store pending requests temporarily
+const pendingRequests = new Map();
+
+// ─── 🔑 Check if user has ANY approval role ────────────────
+function canApprove(member) {
+  if (!member || !member.roles) return false;
+  return config.approvalRoleIds.some(roleId => member.roles.cache.has(roleId));
+}
+
+// ─── Send the starting panel ──────────────────────────────
+async function sendStartPanel(channel) {
+  const embed = new EmbedBuilder()
+    .setTitle('Lorelle ROLE REQUEST')
+    .setDescription(`
+Welcome to Lorelle.
+
+**Request Rules:**
+• Use your correct in-game name
+• Only request roles you are eligible for
+• Every request requires administrative approval
+• Invalid or duplicate requests will be denied
+    `)
+    .setColor(0x2b2d31);
+
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('request').setLabel('Request').setStyle(ButtonStyle.Primary),
+  );
+
+  await channel.send({ embeds: [embed], components: [buttons] });
+}
+
+// ─── On Bot Ready ─────────────────────────────────────────
+client.on('ready', async () => {
+  console.log(`✅ Logged in as ${client.user.tag}`);
+  const adminChannel = client.channels.cache.get(config.addroleid);
+  if (adminChannel) {
+    // sendStartPanel(adminChannel); // comment out after first run
+  }
+});
+
+// ─── Handle All Interactions ───────────────────────────────
+client.on('interactionCreate', async interaction => {
+  if (interaction.isButton()) {
+    await handleButton(interaction);
+  } else if (interaction.isModalSubmit()) {
+    await handleModal(interaction);
+  } else if (interaction.isStringSelectMenu()) {
+    await handleSelect(interaction);
+  }
+});
+
+// ─── Button Handler ────────────────────────────────────────
+async function handleButton(interaction) {
+  const { customId, user, member } = interaction;
+
+  // ─── User starts request ───
+  if (customId === 'request') {
+    const options = config.parentRoles.map(g => ({ label: g.label, value: g.value }));
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId('select_group')
+      .setPlaceholder('Select your role...')
+      .addOptions(options);
+
+    const row = new ActionRowBuilder().addComponents(selectMenu);
+    await interaction.reply({ content: 'Please select your role:', components: [row], ephemeral: true });
+    return;
+  }
+
+  // ─── Admin Action Buttons ───
+  const requestId = customId.split('_').pop();
+  const req = pendingRequests.get(requestId);
+  if (!req) return interaction.reply({ content: '❌ Request not found.', ephemeral: true });
+
+  // 🔒 ONLY specified approval roles can use these buttons
+  if (!canApprove(member)) {
+    return interaction.reply({
+      content: '❌ **Access Denied.** Only authorized approval roles can verify, approve, or deny requests.',
+      ephemeral: true
+    });
+  }
+
+  // ✅ VERIFY
+  // if (customId.startsWith('verify_')) {
+  //   req.verifiedBy = interaction.user;
+  //   await interaction.update({ embeds: [buildAdminEmbed(req)], components: [buildAdminButtons(requestId, true, req.status)] });
+  // }
+
+  // ✅ APPROVE — Assign Role
+  if (customId.startsWith('approve_')) {
+    const guild = interaction.guild;
+    const roleData = config.parentRoles.find(g => g.value === req.groupValue);
+    const role = guild.roles.cache.get(roleData?.roleId);
+    const requester = await guild.members.fetch(req.userId).catch(() => null);
+
+    if (role && requester) {
+      await requester.roles.add(role);
+      req.status = 'APPROVED';
+      req.approvedBy = interaction.user;
+
+      await requester.send({
+        content: `✅ Your role request for **${req.groupName}** has been **APPROVED**!\n📝 In-Game Name: **${req.ign}**`
+      }).catch(() => {});
+
+      await interaction.update({ embeds: [buildAdminEmbed(req)], components: [buildAdminButtons(requestId, true, req.status)] });
+    } else {
+      await interaction.reply({ content: '❌ Role or requester not found.', ephemeral: true });
+    }
+  }
+
+  // ❌ DENY
+  if (customId.startsWith('deny_')) {
+    req.status = 'DENIED';
+    req.deniedBy = interaction.user;
+
+    const requester = await interaction.guild.members.fetch(req.userId).catch(() => null);
+    if (requester) {
+      await requester.send({ content: `❌ Your role request for **${req.groupName}** was **DENIED**.` }).catch(() => {});
+    }
+
+    await interaction.update({ embeds: [buildAdminEmbed(req)], components: [buildAdminButtons(requestId, true, req.status)] });
+  }
+}
+
+// ─── Group Selection → Show Name Modal ──────────────────────
+async function handleSelect(interaction) {
+  if (interaction.customId !== 'select_group') return;
+  const groupValue = interaction.values[0];
+
+  const modal = new ModalBuilder()
+    .setCustomId(`submit_request_${groupValue}`)
+    .setTitle('University Role Request')
+    .addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('in_game_name')
+          .setLabel('IN-GAME NAME')
+          .setPlaceholder('Firstname Lastname')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+      )
+    );
+
+  await interaction.showModal(modal);
+}
+
+// ─── Submit Request → Send to Admin Channel ────────────────
+async function handleModal(interaction) {
+  if (!interaction.customId.startsWith('submit_request_')) return;
+
+  const groupValue = interaction.customId.replace('submit_request_', '');
+  const group = config.parentRoles.find(g => g.value === groupValue);
+  const ign = interaction.fields.getTextInputValue('in_game_name');
+  const requestId = `${interaction.user.id}_${Date.now()}`;
+
+  pendingRequests.set(requestId, {
+    userId: interaction.user.id,
+    userTag: interaction.user.tag,
+    groupValue,
+    groupName: group.label,
+    ign,
+    status: 'PENDING',
+    verifiedBy: null
+  });
+
+  // Send review card to admin channel
+  const embed = new EmbedBuilder()
+    .setTitle('📋 WHITELISTED JOB ROLE REQUEST')
+    .setColor(0x0099ff)
+    .addFields(
+      { name: 'Discord User', value: `<@${interaction.user.id}>`, inline: true },
+      { name: 'In-Game Name', value: `**${ign}**`, inline: true },
+      { name: 'Role Requested', value: `**${group.label}**`, inline: false },
+      { name: 'Verified By', value: 'NO DIRECTOR', inline: true },
+      { name: 'Status', value: '🔵 NOT APPROVED\nWaiting for approval', inline: false }
+    )
+    .setFooter({ text: `Request ID: ${requestId}` });
+
+  const buttons = buildAdminButtons(requestId, false, 'PENDING');
+  const adminChannel = client.channels.cache.get(config.adminChannelId);
+  await adminChannel.send({ embeds: [embed], components: [buttons] });
+
+  await interaction.reply({
+    content: '✅ Your role request has been submitted!\n⏳ Waiting for approval from authorized staff.',
+    ephemeral: true
+  });
+}
+
+// ─── Build Updated Embed ────────────────────────────────────
+function buildAdminEmbed(req) {
+  const statusText = {
+    PENDING: '🔵 NOT APPROVED\nWaiting for approval',
+    APPROVED: '🟢 APPROVED\nRole has been assigned!',
+    DENIED: '🔴 DENIED'
+  }[req.status];
+
+  const color = { PENDING: 0x0099ff, APPROVED: 0x00ff00, DENIED: 0xff0000 }[req.status];
+  const verifiedBy = req.verifiedBy ? `<@${req.verifiedBy.id}>` : 'NO DIRECTOR';
+
+  return new EmbedBuilder()
+    .setTitle('📋 WHITELISTED JOB ROLE REQUEST')
+    .setColor(color)
+    .addFields(
+      { name: 'Discord User', value: `<@${req.userId}>`, inline: true },
+      { name: 'In-Game Name', value: `**${req.ign}**`, inline: true },
+      { name: 'Role Requested', value: `**${req.groupName}**`, inline: false },
+      { name: 'Verified By', value: verifiedBy, inline: true },
+      { name: 'Status', value: statusText, inline: false }
+    );
+}
+
+// ─── Build Action Buttons ───────────────────────────────────
+function buildAdminButtons(requestId, disabled = false, status = 'PENDING') {
+  const isDone = status !== 'PENDING';
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`verify_${requestId}`).setLabel('VERIFY').setStyle(ButtonStyle.Primary).setDisabled(disabled || isDone),
+    new ButtonBuilder().setCustomId(`approve_${requestId}`).setLabel('APPROVE').setStyle(ButtonStyle.Success).setDisabled(disabled || isDone),
+    new ButtonBuilder().setCustomId(`deny_${requestId}`).setLabel('DENY').setStyle(ButtonStyle.Danger).setDisabled(disabled || isDone)
+  );
+}
+
+client.login(config.token);
